@@ -1,0 +1,10 @@
+/*
+Задание:
+Как в прошлом задании определите 5 самых дорогих товаров в таблице products. Но теперь колонки name и price переименуйте соответственно в product_name и product_price.
+Поля в результирующей таблице: product_name, product_price
+*/
+
+SELECT name as product_name,
+       price as product_price
+FROM   products
+ORDER BY price desc limit 5
