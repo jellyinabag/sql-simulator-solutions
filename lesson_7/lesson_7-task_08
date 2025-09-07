@@ -1,0 +1,23 @@
+/*
+Задание:
+Используя данные из таблицы user_actions, рассчитайте, сколько заказов сделал каждый пользователь и отразите это в столбце orders_count.
+В отдельном столбце orders_avg напротив каждого пользователя укажите среднее число заказов всех пользователей, округлив его до двух знаков после запятой.
+Также для каждого пользователя посчитайте отклонение числа заказов от среднего значения. Отклонение считайте так: число заказов «минус» округлённое среднее значение. 
+Колонку с отклонением назовите orders_diff.
+Результат отсортируйте по возрастанию id пользователя. Добавьте в запрос оператор LIMIT и выведите только первые 1000 строк результирующей таблицы.
+Поля в результирующей таблице: user_id, orders_count, orders_avg, orders_diff
+*/
+
+with subquery as (SELECT count(order_id) filter (WHERE action = 'create_order') as orders_count,
+                         user_id
+                  FROM   user_actions
+                  GROUP BY user_id)
+SELECT user_id,
+       count(order_id) filter (WHERE action = 'create_order') as orders_count,
+       (SELECT round(avg(orders_count), 2)
+ FROM   subquery) as orders_avg, count(order_id) filter (
+WHERE  action = 'create_order') - (SELECT round(avg(orders_count), 2)
+                                   FROM   subquery) as orders_diff
+FROM   user_actions
+GROUP BY user_id
+ORDER BY user_id limit 1000
