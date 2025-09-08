@@ -1,0 +1,16 @@
+/*
+Задание:
+Посчитайте возраст каждого пользователя в таблице users.
+Возраст измерьте числом полных лет, как мы делали в прошлых уроках. Возраст считайте относительно последней даты в таблице user_actions.
+Для тех пользователей, у которых в таблице users не указана дата рождения, укажите среднее значение возраста всех остальных пользователей, округлённое до целого числа.
+Колонку с возрастом назовите age. В результат включите колонки с id пользователя и возрастом. Отсортируйте полученный результат по возрастанию id пользователя.
+Поля в результирующей таблице: user_id, age
+*/
+
+SELECT user_id,
+       (case when birth_date is null then (SELECT avg(date_part('year', age((SELECT max(time) FROM user_actions), birth_date)))
+                                    FROM   users
+                                    WHERE  birth_date is not null) else date_part('year', age((SELECT max(time)
+                                                           FROM   user_actions), birth_date)) end)::integer as age
+FROM   users
+ORDER BY user_id
