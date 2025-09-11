@@ -1,0 +1,20 @@
+/*
+Задание:
+По данным таблиц orders, products и user_actions посчитайте ежедневную выручку сервиса. Под выручкой будем понимать стоимость всех реализованных товаров, содержащихся в заказах.
+Колонку с датой назовите date, а колонку со значением выручки — revenue.
+В расчётах учитывайте только неотменённые заказы.
+Результат отсортируйте по возрастанию даты.
+Поля в результирующей таблице: date, revenue
+*/
+
+SELECT date,
+       sum(price)::decimal as revenue
+FROM   products join (SELECT time::date as date,
+                             unnest(product_ids) as product_id
+                      FROM   user_actions
+                          LEFT JOIN orders using(order_id)
+                      WHERE  order_id not in (SELECT order_id
+                                              FROM   user_actions
+                                              WHERE  action = 'cancel_order')) as a using(product_id)
+GROUP BY date
+ORDER BY date
