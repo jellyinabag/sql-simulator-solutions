@@ -1,0 +1,19 @@
+/*
+Задание:
+Используя запрос из предыдущего задания, рассчитайте суммарную стоимость каждого заказа. Выведите колонки с id заказов и их стоимостью. Колонку со стоимостью заказа назовите order_price. 
+Результат отсортируйте по возрастанию id заказа.
+Добавьте в запрос оператор LIMIT и выведите только первые 1000 строк результирующей таблицы.
+Поля в результирующей таблице: order_id, order_price
+*/
+
+SELECT DISTINCT order_id,
+                sum(price) as order_price
+FROM   (SELECT order_id,
+               unnest_products.product_id,
+               price
+        FROM   (SELECT unnest(product_ids) as product_id,
+                       order_id
+                FROM   orders) as unnest_products join products
+                ON unnest_products.product_id = products.product_id) as a
+GROUP BY order_id
+ORDER BY order_id limit 1000
