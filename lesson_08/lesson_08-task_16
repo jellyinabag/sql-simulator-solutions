@@ -1,0 +1,25 @@
+/*
+Задание:
+По таблицам courier_actions , orders и products определите 10 самых популярных товаров, доставленных в сентябре 2022 года.
+Самыми популярными товарами будем считать те, которые встречались в заказах чаще всего. 
+Если товар встречается в одном заказе несколько раз (было куплено несколько единиц товара), то при подсчёте учитываем только одну единицу товара.
+Выведите наименования товаров и сколько раз они встречались в заказах. Новую колонку с количеством покупок товара назовите times_purchased. 
+Поля в результирующей таблице: name, times_purchased
+*/
+
+SELECT name,
+       times_purchased
+FROM   (SELECT product_id,
+               count(distinct order_id) as times_purchased
+        FROM   (SELECT orders.order_id,
+                       unnest(product_ids) as product_id,
+                       time
+                FROM   orders
+                    LEFT JOIN courier_actions
+                        ON orders.order_id = courier_actions.order_id
+                WHERE  action = 'deliver_order'
+                   and time between '2022-09-01 00:00:00'
+                   and '2022-09-30 23:59:59') as a
+        GROUP BY product_id) as b join products
+        ON b.product_id = products.product_id
+ORDER BY times_purchased desc limit 10
