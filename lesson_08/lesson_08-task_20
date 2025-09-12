@@ -1,0 +1,30 @@
+/*
+Задание:
+Выясните, кто заказывал и доставлял самые большие заказы. Самыми большими считайте заказы с наибольшим числом товаров.
+Выведите id заказа, id пользователя и id курьера. Также в отдельных колонках укажите возраст пользователя и возраст курьера. 
+Возраст измерьте числом полных лет, как мы делали в прошлых уроках. 
+Считайте его относительно последней даты в таблице user_actions — как для пользователей, так и для курьеров. Колонки с возрастом назовите user_age и courier_age. 
+Результат отсортируйте по возрастанию id заказа.
+Поля в результирующей таблице: order_id, user_id, user_age, courier_id, courier_age
+*/
+
+with max_date as (SELECT max(time) as latest_date
+                  FROM   user_actions), orders_data as (SELECT DISTINCT user_actions.order_id,
+                                                      user_actions.user_id,
+                                                      courier_actions.courier_id
+                                      FROM   user_actions join courier_actions
+                                              ON user_actions.order_id = courier_actions.order_id
+                                      WHERE  user_actions.action = 'create_order'
+                                         and courier_actions.action = 'deliver_order')
+SELECT orders.order_id,
+       users.user_id,
+       date_part('year', age(latest_date, users.birth_date))::varchar as user_age,
+       couriers.courier_id,
+       date_part('year', age(latest_date, couriers.birth_date))::varchar as courier_age
+FROM   orders join orders_data
+        ON orders.order_id = orders_data.order_id join users
+        ON orders_data.user_id = users.user_id join couriers
+        ON orders_data.courier_id = couriers.courier_id cross join max_date
+WHERE  array_length(orders.product_ids, 1) = (SELECT max(array_length(product_ids, 1))
+                                              FROM   orders)
+ORDER BY orders.order_id
