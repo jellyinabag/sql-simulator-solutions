@@ -1,0 +1,13 @@
+/*
+Задание:
+По таблицам orders и courier_actions определите id десяти заказов, которые доставляли дольше всего.
+Поле в результирующей таблице: order_id
+*/
+
+SELECT order_id
+FROM   (SELECT orders.order_id,
+               time - creation_time as delivery_time
+        FROM   orders join courier_actions
+                ON orders.order_id = courier_actions.order_id
+        WHERE  action = 'deliver_order'
+        ORDER BY delivery_time desc limit 10) as a
