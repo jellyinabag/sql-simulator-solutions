@@ -1,0 +1,15 @@
+/*
+Задача:
+Произведите замену списков с id товаров из таблицы orders на списки с наименованиями товаров. 
+Наименования возьмите из таблицы products. Колонку с новыми списками наименований назовите product_names. 
+Добавьте в запрос оператор LIMIT и выведите только первые 1000 строк результирующей таблицы.
+Поля в результирующей таблице: order_id, product_names
+*/
+
+SELECT order_id,
+       array_agg(name) as product_names
+FROM   ((SELECT order_id,
+                unnest(product_ids) as product_id
+         FROM   orders) as a join products
+        ON a.product_id = products.product_id) as b
+GROUP BY order_id limit 1000
