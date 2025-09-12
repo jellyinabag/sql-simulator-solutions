@@ -1,0 +1,36 @@
+/*
+Задание:
+Выясните, какие пары товаров покупают вместе чаще всего.
+Пары товаров сформируйте на основе таблицы с заказами. Отменённые заказы не учитывайте. 
+В качестве результата выведите две колонки — колонку с парами наименований товаров и колонку со значениями, показывающими, сколько раз конкретная пара встретилась в заказах пользователей.
+Колонки назовите соответственно pair и count_pair.
+Пары товаров должны быть представлены в виде списков из двух наименований. Пары товаров внутри списков должны быть отсортированы в порядке возрастания наименования. 
+Результат отсортируйте сначала по убыванию частоты встречаемости пары товаров в заказах, затем по колонке pair — по возрастанию.
+Поля в результирующей таблице: pair, count_pair
+*/
+
+with unnest_products as (SELECT order_id,
+                                unnest(product_ids) as product_id
+                         FROM   orders
+                         WHERE  order_id not in (SELECT order_id
+                                                 FROM   user_actions
+                                                 WHERE  action = 'cancel_order'
+                                                 GROUP BY order_id)), product_pairs as (SELECT up1.order_id,
+                                              up1.product_id as product_id1,
+                                              up2.product_id as product_id2
+                                       FROM   unnest_products up1 join unnest_products up2
+                                               ON up1.order_id = up2.order_id and
+                                                  up1.product_id > up2.product_id), pairs_with_names as (SELECT product_pairs.order_id,
+                                                              array[least(p1.name, p2.name),
+                                                              greatest(p1.name, p2.name)] as pair
+                                                       FROM   product_pairs join products p1
+                                                               ON product_pairs.product_id1 = p1.product_id join products p2
+                                                               ON product_pairs.product_id2 = p2.product_id
+                                                       WHERE  p1.name <> p2.name), unique_pairs as (SELECT DISTINCT order_id,
+                                                             pair
+                                             FROM   pairs_with_names)
+SELECT pair,
+       count(order_id) as count_pair
+FROM   unique_pairs
+GROUP BY pair
+ORDER BY count_pair desc, pair
