@@ -12,5 +12,4 @@ SELECT product_id,
        max(price) OVER(ORDER BY price desc) as max_price,
        min(price) OVER(ORDER BY price desc) as min_price
 FROM   products
-GROUP BY product_id
 ORDER BY price desc, product_id
