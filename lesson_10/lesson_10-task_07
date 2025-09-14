@@ -1,0 +1,35 @@
+/*
+Задание:
+На основе запроса из предыдущего задания для каждого пользователя рассчитайте, сколько в среднем времени проходит между его заказами. 
+Посчитайте этот показатель только для тех пользователей, которые за всё время оформили более одного неотмененного заказа.
+Среднее время между заказами выразите в часах, округлив значения до целого числа. Колонку со средним значением времени назовите hours_between_orders. 
+Результат отсортируйте по возрастанию id пользователя.
+Добавьте в запрос оператор LIMIT и включите в результат только первые 1000 записей.
+Поля в результирующей таблице: user_id, hours_between_orders
+*/
+
+with time_per_order as (SELECT user_id,
+                               order_id,
+                               lag(time) OVER(PARTITION BY user_id
+                                              ORDER BY time) as time_lag,
+                               time - lag(time) OVER(PARTITION BY user_id
+                                                     ORDER BY time) as time_diff
+                        FROM   user_actions
+                        WHERE  order_id not in (SELECT order_id
+                                                FROM   user_actions
+                                                WHERE  action = 'cancel_order')
+                        ORDER BY user_id, order_id), orders_number as (SELECT user_id,
+                                                      count(distinct order_id) as orders_count
+                                               FROM   user_actions
+                                               WHERE  order_id not in (SELECT order_id
+                                                                       FROM   user_actions
+                                                                       WHERE  action = 'cancel_order')
+                                               GROUP BY user_id having count(distinct order_id) = 1)
+SELECT user_id,
+       ((extract(epoch
+FROM   avg(time_diff))) / 3600) :: integer as hours_between_orders
+FROM   time_per_order
+WHERE  user_id not in (SELECT user_id
+                       FROM   orders_number)
+GROUP BY user_id
+ORDER BY user_id limit 1000
