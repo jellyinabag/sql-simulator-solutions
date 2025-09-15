@@ -1,0 +1,28 @@
+/*
+Задание:
+С помощью оконной функции отберите из таблицы courier_actions всех курьеров, которые работают в нашей компании 10 и более дней. 
+Также рассчитайте, сколько заказов они уже успели доставить за всё время работы.
+Будем считать, что наш сервис предлагает самые выгодные условия труда и поэтому за весь анализируемый период ни один курьер не уволился из компании. 
+Возможные перерывы между сменами не учитывайте — для нас важна только разница во времени между первым действием курьера и текущей отметкой времени.
+Текущей отметкой времени, относительно которой необходимо рассчитывать продолжительность работы курьера, считайте время последнего действия в таблице courier_actions. 
+Учитывайте только целые дни, прошедшие с момента первого выхода курьера на работу (часы и минуты не учитывайте).
+В результат включите три колонки: id курьера, продолжительность работы в днях и число доставленных заказов. Две новые колонки назовите соответственно days_employed и delivered_orders. 
+Результат отсортируйте сначала по убыванию количества отработанных дней, затем по возрастанию id курьера.
+Поля в результирующей таблице: courier_id, days_employed, delivered_orders
+*/
+
+with count_all as (SELECT courier_id,
+                          count(order_id) filter (WHERE action = 'deliver_order') as delivered_orders,
+                          min(time) filter (WHERE action = 'accept_order') as min_time,
+                          max(time) as max_time
+                   FROM   courier_actions
+                   GROUP BY courier_id), count_days as (SELECT courier_id,
+                                            delivered_orders,
+                                            date_part('day', (max(max_time) OVER() - min_time))::integer as days_employed
+                                     FROM   count_all)
+SELECT courier_id,
+       days_employed,
+       delivered_orders
+FROM   count_days
+WHERE  days_employed >= 10
+ORDER BY days_employed desc, courier_id
