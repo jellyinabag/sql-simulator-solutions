@@ -1,0 +1,29 @@
+/*
+Задание:
+К запросу, полученному на предыдущем шаге, примените оконную функцию и для каждого дня посчитайте долю первых и повторных заказов. 
+Сохраните структуру полученной ранее таблицы и добавьте только одну новую колонку с посчитанными значениями.
+Колонку с долей заказов каждой категории назовите orders_share. Значения в полученном столбце округлите до двух знаков после запятой. 
+В результат также включите количество заказов в группах, посчитанное на предыдущем шаге.
+В расчётах по-прежнему учитывайте только неотменённые заказы.
+Результат отсортируйте сначала по возрастанию даты, затем по возрастанию значений в колонке с типом заказа.
+Поля в результирующей таблице: date, order_type, orders_count, orders_share
+*/
+
+with first_orders as (SELECT time::date as date,
+                             order_id,
+                             case when time = first_value(time) OVER(PARTITION BY user_id
+                                                                     ORDER BY time) then 'Первый'
+                                  else 'Повторный' end as order_type,
+                             count(order_id) OVER (PARTITION BY time::date) as orders_per_day
+                      FROM   user_actions
+                      WHERE  order_id not in (SELECT order_id
+                                              FROM   user_actions
+                                              WHERE  action = 'cancel_order')
+                         and action = 'create_order')
+SELECT date,
+       order_type,
+       count(order_id) as orders_count,
+       round(count(order_id)::decimal / max(orders_per_day), 2) as orders_share
+FROM   first_orders
+GROUP BY date, order_type
+ORDER BY date, order_type
