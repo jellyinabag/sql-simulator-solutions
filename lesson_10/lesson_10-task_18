@@ -1,0 +1,38 @@
+/*
+Задание:
+С помощью оконной функции рассчитайте медианную стоимость всех заказов из таблицы orders, оформленных в нашем сервисе. 
+В качестве результата выведите одно число. Колонку с ним назовите median_price. Отменённые заказы не учитывайте.
+Поле в результирующей таблице: median_price
+*/
+
+with unnest_products as (SELECT order_id,
+                                creation_time,
+                                unnest(product_ids) as product_id
+                         FROM   orders
+                         WHERE  order_id not in (SELECT order_id
+                                                 FROM   user_actions
+                                                 WHERE  action = 'cancel_order')), joined_table as (SELECT unnest_products.order_id,
+                                                          unnest_products.creation_time,
+                                                          products.price
+                                                   FROM   unnest_products join products
+                                                           ON unnest_products.product_id = products.product_id), order_prices as (SELECT order_id,
+                                                                              sum(price) as order_price
+                                                                       FROM   joined_table
+                                                                       GROUP BY order_id), numbered_orders as (SELECT ROW_NUMBER() OVER(ORDER BY order_price) as number,
+                                                                                                                        order_price,
+                                                                                                                        order_id
+                                                                                                                FROM order_prices)
+                                                                       
+SELECT CASE
+WHEN even_or_odd = 'четное' THEN ((SELECT order_price FROM numbered_orders WHERE number = median_number) + (SELECT order_price FROM numbered_orders WHERE number = median_number + 1)) / 2
+ELSE (SELECT order_price FROM numbered_orders WHERE number = median_number)
+END AS median_price
+FROM (SELECT CASE 
+WHEN MAX(number) % 2 = 0 THEN MAX(number) / 2
+ELSE ((MAX(number) + 1) / 2)
+END as median_number,
+CASE
+WHEN MAX(number) % 2 = 0 THEN 'четное'
+ELSE 'нечетное' 
+END as even_or_odd
+FROM numbered_orders) as defined_number
