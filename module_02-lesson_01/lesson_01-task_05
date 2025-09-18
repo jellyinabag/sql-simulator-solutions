@@ -1,0 +1,49 @@
+/*
+Задание:
+Для каждого дня, представленного в таблице user_actions, рассчитайте следующие показатели:
+- Общее число заказов.
+- Число первых заказов (заказов, сделанных пользователями впервые).
+- Число заказов новых пользователей (заказов, сделанных пользователями в тот же день, когда они впервые воспользовались сервисом).
+- Долю первых заказов в общем числе заказов (долю п.2 в п.1).
+- Долю заказов новых пользователей в общем числе заказов (долю п.3 в п.1).
+Колонки с показателями назовите соответственно orders, first_orders, new_users_orders, first_orders_share, new_users_orders_share. Колонку с датами назовите date. 
+Проследите за тем, чтобы во всех случаях количество заказов было выражено целым числом. Все показатели с долями необходимо выразить в процентах. 
+При расчёте долей округляйте значения до двух знаков после запятой.
+Результат должен быть отсортирован по возрастанию даты.
+Поля в результирующей таблице: date, orders, first_orders, new_users_orders, first_orders_share, new_users_orders_share
+*/
+
+with count_orders as (SELECT time::date as date,
+                             count(distinct order_id) filter (WHERE order_id not in (SELECT order_id
+                                                                              FROM   user_actions
+                                                                              WHERE  action = 'cancel_order')) as orders
+                      FROM   user_actions
+                      GROUP BY date), first as (SELECT user_id,
+                                 (min(time) filter (WHERE action = 'create_order' and order_id not in (SELECT order_id
+                                                                                                FROM   user_actions
+                                                                                                WHERE  action = 'cancel_order')))::date as first_order
+                          FROM   user_actions
+                          GROUP BY user_id), count_first_orders as (SELECT first_order::date as date,
+                                                 count(user_id) as count_first
+                                          FROM   first
+                                          GROUP BY date), user_registration as (SELECT user_id,
+                                             min(time)::date as reg_date
+                                      FROM   user_actions
+                                      GROUP BY user_id), new_users_orders as (SELECT user_actions.time::date as date,
+                                               count(distinct user_actions.order_id) as new_users_orders
+                                        FROM   user_actions join user_registration
+                                                ON user_actions.user_id = user_registration.user_id and
+                                                   user_actions.time::date = user_registration.reg_date
+                                        WHERE  action = 'create_order'
+                                           and user_actions.order_id not in (SELECT order_id
+                                                                          FROM   user_actions
+                                                                          WHERE  action = 'cancel_order')
+                                        GROUP BY date)
+SELECT count_orders.date,
+       orders,
+       count_first as first_orders,
+       new_users_orders,
+       round(count_first * 100 / orders::decimal, 2) as first_orders_share,
+       round(new_users_orders * 100 / orders::decimal, 2) as new_users_orders_share
+FROM   count_orders join count_first_orders using(date) join new_users_orders using(date)
+ORDER BY date
