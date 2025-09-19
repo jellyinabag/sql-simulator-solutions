@@ -1,0 +1,29 @@
+/*
+Задача:
+На основе данных в таблице orders для каждого часа в сутках рассчитайте следующие показатели:
+- Число успешных (доставленных) заказов.
+- Число отменённых заказов.
+- Долю отменённых заказов в общем числе заказов (cancel rate).
+Колонки с показателями назовите соответственно successful_orders, canceled_orders, cancel_rate. Колонку с часом оформления заказа назовите hour. 
+При расчёте доли отменённых заказов округляйте значения до трёх знаков после запятой.
+Результирующая таблица должна быть отсортирована по возрастанию колонки с часом оформления заказа.
+Поля в результирующей таблице: hour, successful_orders, canceled_orders, cancel_rate
+*/
+
+with delivered as (SELECT (date_part('hour', creation_time))::integer as hour,
+                          count(distinct order_id) as successful_orders
+                   FROM   orders join courier_actions using(order_id)
+                   WHERE  action = 'deliver_order'
+                   GROUP BY hour), canceled as (SELECT (date_part('hour', creation_time))::integer as hour,
+                                    count(distinct order_id) as canceled_orders
+                             FROM   orders join user_actions using(order_id)
+                             WHERE  action = 'cancel_order'
+                             GROUP BY hour), all_orders as (SELECT (date_part('hour', creation_time))::integer as hour,
+                                      count(distinct order_id) as all_orders
+                               FROM   orders
+                               GROUP BY hour)
+SELECT all_orders.hour,
+       successful_orders,
+       canceled_orders,
+       round(canceled_orders::decimal / all_orders, 3) as cancel_rate
+FROM   delivered join canceled using(hour) join all_orders using(hour)
