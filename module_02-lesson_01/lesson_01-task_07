@@ -1,0 +1,30 @@
+/*
+Задание:
+На основе данных в таблице courier_actions для каждого дня рассчитайте, за сколько минут в среднем курьеры доставляли свои заказы.
+Колонку с показателем назовите minutes_to_deliver. Колонку с датами назовите date. При расчёте среднего времени доставки округляйте количество минут до целых значений. 
+Учитывайте только доставленные заказы, отменённые заказы не учитывайте.
+Результирующая таблица должна быть отсортирована по возрастанию даты.
+Поля в результирующей таблице: date, minutes_to_deliver
+*/
+
+with accepted_and_delivered as (SELECT accepted_orders.order_id,
+                                       courier_id,
+                                       time_accepted,
+                                       time_delivered FROM(SELECT order_id,
+                                                           courier_id,
+                                                           time as time_accepted
+                                                    FROM   courier_actions
+                                                    WHERE  action = 'accept_order') as accepted_orders join (SELECT order_id,
+                                                                                                time as time_delivered
+                                                                                         FROM   courier_actions
+                                                                                         WHERE  action = 'deliver_order') as delivered_orders
+                                        ON accepted_orders.order_id = delivered_orders.order_id), time_per_order as (SELECT order_id,
+                                                                                    time_delivered::date as date,
+                                                                                    (extract(epoch
+                                                                             FROM   (time_delivered - time_accepted)) / 60)::integer as minutes_to_deliver
+                                                                             FROM   accepted_and_delivered)
+SELECT date,
+       (avg(minutes_to_deliver))::integer as minutes_to_deliver
+FROM   time_per_order
+GROUP BY date
+ORDER BY date
