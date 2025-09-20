@@ -1,0 +1,48 @@
+/*
+Задание:
+Для каждого дня в таблицах orders и user_actions рассчитайте следующие показатели:
+- Выручку на пользователя (ARPU) за текущий день.
+- Выручку на платящего пользователя (ARPPU) за текущий день.
+- Выручку с заказа, или средний чек (AOV) за текущий день.
+Колонки с показателями назовите соответственно arpu, arppu, aov. Колонку с датами назовите date. 
+При расчёте всех показателей округляйте значения до двух знаков после запятой.
+Результат должен быть отсортирован по возрастанию даты. 
+Поля в результирующей таблице: date, arpu, arppu, aov
+*/
+
+with users_and_orders as (SELECT user_id,
+                                 time::date as date
+                          FROM   user_actions
+                          WHERE  action = 'create_order'
+                             and order_id not in (SELECT order_id
+                                               FROM   user_actions
+                                               WHERE  action = 'cancel_order')), users_per_day as (SELECT date,
+                                                           count(distinct user_id) as paying_users
+                                                    FROM   users_and_orders
+                                                    GROUP BY date), all_users_per_day as (SELECT time::date as date,
+                                             count(distinct user_id) as total_users
+                                      FROM   user_actions
+                                      GROUP BY time::date), products_per_day as (SELECT creation_time::date as date,
+                                                  unnest(product_ids) as product_id
+                                           FROM   orders
+                                           WHERE  order_id not in (SELECT order_id
+                                                                   FROM   user_actions
+                                                                   WHERE  action = 'cancel_order')), prices as (SELECT date,
+                                                    products_per_day.product_id,
+                                                    price
+                                             FROM   products_per_day join products using(product_id)), revenue as (SELECT date,
+                                                                             sum(price) as revenue_per_day
+                                                                      FROM   prices
+                                                                      GROUP BY date), orders_day as (SELECT creation_time::date as date,
+                                      count(distinct order_id) as orders_per_day
+                               FROM   orders
+                               WHERE  order_id not in (SELECT order_id
+                                                       FROM   user_actions
+                                                       WHERE  action = 'cancel_order')
+                               GROUP BY date)
+SELECT revenue.date,
+       round(revenue_per_day::decimal / all_users_per_day.total_users, 2) as arpu,
+       round(revenue_per_day::decimal / users_per_day.paying_users, 2) as arppu,
+       round(revenue_per_day::decimal / orders_day.orders_per_day, 2) as aov
+FROM   revenue join users_per_day using(date) join all_users_per_day using(date) join orders_day using(date)
+ORDER BY date
