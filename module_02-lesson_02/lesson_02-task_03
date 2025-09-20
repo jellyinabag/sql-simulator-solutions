@@ -1,0 +1,55 @@
+/*
+Задание:
+По таблицам orders и user_actions для каждого дня рассчитайте следующие показатели:
+- Накопленную выручку на пользователя (Running ARPU).
+- Накопленную выручку на платящего пользователя (Running ARPPU).
+- Накопленную выручку с заказа, или средний чек (Running AOV).
+Колонки с показателями назовите соответственно running_arpu, running_arppu, running_aov. Колонку с датами назовите date. 
+При расчёте всех показателей округляйте значения до двух знаков после запятой.
+Результат должен быть отсортирован по возрастанию даты. 
+Поля в результирующей таблице: date, running_arpu, running_arppu, running_aov
+*/
+
+with daily_revenue_orders as (SELECT creation_time::date as date,
+                                     sum(price) as daily_revenue,
+                                     count(distinct order_id) as daily_orders
+                              FROM   (SELECT order_id,
+                                             creation_time,
+                                             unnest(product_ids) as product_id
+                                      FROM   orders
+                                      WHERE  order_id not in (SELECT order_id
+                                                              FROM   user_actions
+                                                              WHERE  action = 'cancel_order')) t
+                                  LEFT JOIN products using (product_id)
+                              GROUP BY date), accum_revenue_orders as (SELECT date,
+                                                sum(daily_revenue) OVER (ORDER BY date) as accum_revenue,
+                                                sum(daily_orders) OVER (ORDER BY date) as accum_orders
+                                         FROM   daily_revenue_orders), user_first_action as (SELECT user_id,
+                                                           min(time::date) as first_action_date
+                                                    FROM   user_actions
+                                                    GROUP BY user_id), daily_new_users as (SELECT first_action_date as date,
+                                              count(user_id) as new_users
+                                       FROM   user_first_action
+                                       GROUP BY first_action_date), accum_total_users as (SELECT date,
+                                                          sum(new_users) OVER (ORDER BY date) as running_total_users
+                                                   FROM   daily_new_users), paying_user_first_action as (SELECT user_id,
+                                                             min(time::date) as first_purchase_date
+                                                      FROM   user_actions
+                                                      WHERE  action = 'create_order'
+                                                         and order_id not in (SELECT order_id
+                                                                           FROM   user_actions
+                                                                           WHERE  action = 'cancel_order')
+                                                      GROUP BY user_id), daily_new_paying_users as (SELECT first_purchase_date as date,
+                                                     count(user_id) as new_paying_users
+                                              FROM   paying_user_first_action
+                                              GROUP BY first_purchase_date), accum_paying_users as (SELECT date,
+                                                             sum(new_paying_users) OVER (ORDER BY date) as running_paying_users
+                                                      FROM   daily_new_paying_users)
+SELECT accum_revenue_orders.date,
+       round(accum_revenue::decimal / running_total_users, 2) as running_arpu,
+       round(accum_revenue::decimal / running_paying_users, 2) as running_arppu,
+       round(accum_revenue::decimal / accum_orders, 2) as running_aov
+FROM   accum_revenue_orders
+    LEFT JOIN accum_total_users using(date)
+    LEFT JOIN accum_paying_users using(date)
+ORDER BY date
