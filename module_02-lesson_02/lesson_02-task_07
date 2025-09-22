@@ -1,0 +1,88 @@
+/*
+Задание:
+Для каждого дня в таблицах orders и courier_actions рассчитайте следующие показатели:
+1. Выручку, полученную в этот день.
+2. Затраты, образовавшиеся в этот день.
+3. Сумму НДС с продажи товаров в этот день.
+4. Валовую прибыль в этот день (выручка за вычетом затрат и НДС).
+5. Суммарную выручку на текущий день.
+6. Суммарные затраты на текущий день.
+7. Суммарный НДС на текущий день.
+8. Суммарную валовую прибыль на текущий день.
+9. Долю валовой прибыли в выручке за этот день (долю п.4 в п.1).
+10. Долю суммарной валовой прибыли в суммарной выручке на текущий день (долю п.8 в п.5).
+Колонки с показателями назовите соответственно revenue, costs, tax, gross_profit, total_revenue, total_costs, total_tax, total_gross_profit, gross_profit_ratio, total_gross_profit_ratio
+Колонку с датами назовите date.
+Долю валовой прибыли в выручке необходимо выразить в процентах, округлив значения до двух знаков после запятой.
+Результат должен быть отсортирован по возрастанию даты.
+Поля в результирующей таблице: date, revenue, costs, tax, gross_profit, total_revenue, total_costs, total_tax, total_gross_profit, gross_profit_ratio,total_gross_profit_ratio
+Чтобы посчитать затраты, в этой задаче введём дополнительные условия.
+В упрощённом виде затраты нашего сервиса будем считать как сумму постоянных и переменных издержек. 
+К постоянным издержкам отнесём аренду складских помещений, а к переменным — стоимость сборки и доставки заказа. Таким образом, переменные затраты будут напрямую зависеть от числа заказов.
+Из данных, которые нам предоставил финансовый отдел, известно, что в августе 2022 года постоянные затраты составляли 120 000 рублей в день. 
+Однако уже в сентябре нашему сервису потребовались дополнительные помещения, и поэтому постоянные затраты возросли до 150 000 рублей в день.
+Также известно, что в августе 2022 года сборка одного заказа обходилась нам в 140 рублей, при этом курьерам мы платили по 150 рублей за один доставленный заказ и 
+ещё 400 рублей ежедневно в качестве бонуса, если курьер доставлял не менее 5 заказов в день. 
+В сентябре продакт-менеджерам удалось снизить затраты на сборку заказа до 115 рублей, но при этом пришлось повысить бонусную выплату за доставку 5 и более заказов до 500 рублей, 
+чтобы обеспечить более конкурентоспособные условия труда. При этом в сентябре выплата курьерам за один доставленный заказ осталась неизменной.
+*/
+
+with unnest_products as (SELECT creation_time::date as date,
+                                unnest(product_ids) as product_id
+                         FROM   orders
+                         WHERE  order_id not in (SELECT order_id
+                                                 FROM   user_actions
+                                                 WHERE  action = 'cancel_order')), prices as (SELECT date,
+                                                    products.product_id,
+                                                    price
+                                             FROM   unnest_products join products using(product_id)), daily_revenue as (SELECT date,
+                                                                                  sum(price) as revenue_per_day
+                                                                           FROM   prices
+                                                                           GROUP BY date), count_orders as (SELECT creation_time::date as date,
+                                        count(distinct order_id) as count_orders
+                                 FROM   orders
+                                 WHERE  order_id not in (SELECT order_id
+                                                         FROM   user_actions
+                                                         WHERE  action = 'cancel_order')
+                                 GROUP BY date), count_delivery as (SELECT time::date as date,
+                                          count(order_id) as count_delivery
+                                   FROM   courier_actions
+                                   WHERE  action = 'deliver_order'
+                                   GROUP BY date), count_couriers as (SELECT courier_id,
+                                          time::date as date,
+                                          count(courier_actions.order_id) as count_orders
+                                   FROM   courier_actions
+                                   WHERE  action = 'deliver_order'
+                                   GROUP BY date, courier_id), count_bonuses as (SELECT date,
+                                                     count(courier_id) filter (WHERE count_orders >= 5) as bonuses
+                                              FROM   count_couriers
+                                              GROUP BY date), expences_per_day as (SELECT date,
+                                            case when date <= '2022-08-31' then round((count_orders * 140 + count_delivery * 150 + bonuses * 400 + 120000),
+                                                                                      2)
+                                                 else round((count_orders * 115 + count_delivery * 150 + bonuses * 500 + 150000),
+                                                            2) end as expences
+                                     FROM   count_orders join count_bonuses using(date) join count_delivery using(date)), nds as (SELECT date,
+                                                                                                    product_id,
+                                                                                                    name,
+                                                                                                    case when name in ('сахар', 'сухарики', 'сушки', 'семечки', 'масло льняное', 'виноград', 'масло оливковое', 'арбуз', 'батон', 'йогурт', 'сливки', 'гречка', 'овсянка', 'макароны', 'баранина', 'апельсины', 'бублики', 'хлеб', 'горох', 'сметана', 'рыба копченая', 'мука', 'шпроты', 'сосиски', 'свинина', 'рис', 'масло кунжутное', 'сгущенка', 'ананас', 'говядина', 'соль', 'рыба вяленая', 'масло подсолнечное', 'яблоки', 'груши', 'лепешка', 'молоко', 'курица', 'лаваш', 'вафли', 'мандарины') then round((prices.price::decimal / 110) * 10,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      2)
+                                                                                                         else round((prices.price::decimal / 120) * 20, 2) end as nds
+                                                                                             FROM   prices join products using(product_id)), nds_sum as (SELECT date,
+                                                                   sum(nds) as nds_sum
+                                                            FROM   nds
+                                                            GROUP BY date)
+SELECT daily_revenue.date,
+       revenue_per_day as revenue,
+       expences as costs,
+       nds_sum as tax,
+       (revenue_per_day - expences - nds_sum) as gross_profit,
+       sum(revenue_per_day) OVER(ORDER BY date rows between unbounded preceding and current row) as total_revenue,
+       sum(expences) OVER(ORDER BY date rows between unbounded preceding and current row) as total_costs,
+       sum(nds_sum) OVER(ORDER BY date rows between unbounded preceding and current row) as total_tax,
+       sum(revenue_per_day - expences - nds_sum) OVER(ORDER BY date rows between unbounded preceding and current row) as total_gross_profit,
+       round((revenue_per_day - expences - nds_sum) * 100 / revenue_per_day::decimal,
+             2) as gross_profit_ratio,
+       round(sum(revenue_per_day - expences - nds_sum) OVER(ORDER BY date rows between unbounded preceding and current row) * 100 / (sum(revenue_per_day) OVER(ORDER BY date rows between unbounded preceding and current row))::decimal,
+             2) as total_gross_profit_ratio
+FROM   daily_revenue join expences_per_day using(date) join nds_sum using(date)
+ORDER BY date
